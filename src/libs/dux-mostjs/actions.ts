@@ -1,11 +1,13 @@
-import { create } from 'most-subject';
+import { Scheduler } from '@most/types';
+
+import { create } from '../subject';
 
 import { Action } from './models';
-import { sink } from './utils';
+import { sinkFactory } from './sinkFactory';
 
-export const actionFactory = () => {
+export const actionFactory = (scheduler: Scheduler) => {
   const [actionSink, actionStream] = create<Action>();
-  const dispatch = sink(actionSink);
+  const dispatch = sinkFactory(scheduler)(actionSink);
 
   return {
     actionSink,

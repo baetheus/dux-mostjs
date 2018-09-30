@@ -1,10 +1,13 @@
-import { create } from 'most-subject';
 import { scan, map } from '@most/core';
+import { Scheduler } from '@most/types';
+
+import { create } from '../subject';
+import { hold } from '../hold';
 
 import { ReducerModify, ReducerAdd, Action, Reducer, State } from './models';
-import { sink } from './utils';
+import { sinkFactory } from './sinkFactory';
 
-export const reducerFactory = <S>() => {
+export const reducerFactory = <S>(scheduler: Scheduler) => {
   const [reducersModifySink, reducersModifyStream] = create<ReducerModify>();
   const reducersStream = scan(
     (rs, nr) => {
@@ -20,9 +23,8 @@ export const reducerFactory = <S>() => {
     [] as ReducerAdd[],
     reducersModifyStream
   );
-  const reducerSink = sink<ReducerModify>(reducersModifySink);
-
-  const reducerStream = map(
+  const reducerSink = sinkFactory(scheduler)<ReducerModify>(reducersModifySink);
+  const reducerStreamRaw = map(
     s =>
       s.reduce(
         (acc, r) => (s: State<S>, a: Action) => r.reducer(acc(s, a), a),
@@ -30,6 +32,8 @@ export const reducerFactory = <S>() => {
       ),
     reducersStream
   );
+
+  const reducerStream: typeof reducerStreamRaw = hold(reducerStreamRaw);
   const addReducer = (key: string, reducer: Reducer<S>) =>
     reducerSink({ change: 'add', key, reducer });
   const removeReducer = (key: string) => reducerSink({ change: 'remove', key });

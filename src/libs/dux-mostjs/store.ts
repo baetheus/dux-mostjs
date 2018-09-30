@@ -1,65 +1,20 @@
-import { combine, snapshot, scan, skipRepeats, map, run } from '@most/core';
-import { hold } from '@most/hold';
+import { Scheduler } from '@most/types';
 
+import { scheduler as _scheduler } from './scheduler';
 import { actionFactory } from './actions';
-import { metaReducerFactory } from './metareducers';
-import { reducerFactory } from './reducers';
-import { selectorFactory } from './selectors';
-import { StoreReduction, State } from './models';
-import { scheduler } from './utils';
+import { State } from './models';
 
-export const createStore = <S extends {}>(initialState: State<S>) => {
-  const {
-    metaReducerStream,
-    addMetaReducer,
-    removeMetaReducer,
-  } = metaReducerFactory<S>();
-  const { reducerStream, addReducer, removeReducer } = reducerFactory<S>();
-  const { actionSink, actionStream, dispatch } = actionFactory();
-
-  // Combine MetaReducers and Reducers
-  const reducer = combine((mr, r) => mr(r), metaReducerStream, reducerStream);
-
-  // Snapshot Actions with Reducer
-  const actionReducer = snapshot(
-    (reducer, action) => ({ reducer, action }),
-    reducer,
-    actionStream
-  );
-
-  // Store and State
-  const store = scan(
-    ({ next }: StoreReduction<State<S>>, { action, reducer }) => ({
-      prev: next,
-      action,
-      next: reducer(next, action),
-    }),
-    {
-      next: initialState,
-      prev: initialState,
-      action: { type: '__INIT_STORE__' },
-    },
-    actionReducer
-  );
-  const currentState = skipRepeats(map(({ next }) => next, store));
-  const state = hold(currentState);
-
-  // Selectors
-  const select = selectorFactory<S>(state);
-
-  // Initialize
-  run(actionSink, scheduler);
-  addMetaReducer('IDENTITY_META_REDUCER', r => r);
-  addReducer('IDENTITY_REDUCER', s => s);
+export const storeFactory = <S extends {}>(
+  initialState: State<S>,
+  scheduler: Scheduler = _scheduler
+) => {
+  const { actionSink, actionStream, dispatch } = actionFactory(scheduler);
 
   return {
-    addMetaReducer,
-    removeMetaReducer,
-    addReducer,
-    removeReducer,
-    dispatch,
-    select,
-    state,
     scheduler,
+
+    actionSink,
+    actionStream,
+    dispatch,
   };
 };
